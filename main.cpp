@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -29,6 +31,7 @@ private:
     Peminjam* head;
     Peminjam* tail;
     vector<Alat> daftarAlat;
+    string peminjamCSV = "data_peminjaman.csv";
 
     // Fungsi Pembantu untuk Navigasi (Fitur No 6)
     void kembaliKeMenu() {
@@ -38,10 +41,91 @@ private:
         cin.get();
     }
 
+    string cariNIM(string nama) {
+        Peminjam* temp = head;
+        while (temp) {
+            if (temp->nama == nama) {
+                return temp->nim;
+            }
+            temp = temp->next;
+        }
+        return "";
+    }
+
+    void simpanKeCSV() {
+        ofstream file(peminjamCSV);
+        if (!file.is_open()) return;
+        
+        file << "Nama,NIM,Ruangan,NamaAlat,Kondisi,Jam,Tanggal,Bulan,Tahun,Status\n";
+        Peminjam* temp = head;
+        while (temp) {
+            file << temp->nama << ","
+                << temp->nim << ","
+                << temp->ruangan << ","
+                << temp->namaAlat << ","
+                << temp->kondisi << ","
+                << temp->jam << ","
+                << temp->tgl << ","
+                << temp->bln << ","
+                << temp->thn << ","
+                << (temp->masihDipinjam ? "Dipinjam" : "Dikembalikan") << "\n";
+            temp = temp->next;
+        }
+        file.close();
+    }
+
+    void muatDariCSV() {
+        ifstream file(peminjamCSV);
+        if (!file.is_open()) return;
+        
+        string line;
+        bool isHeader = true;
+        
+        while (getline(file, line)) {
+            if (isHeader) { isHeader = false; continue; }
+            
+            stringstream ss(line);
+            Peminjam* baru = new Peminjam();
+            
+            getline(ss, baru->nama, ',');
+            getline(ss, baru->nim, ',');
+            getline(ss, baru->ruangan, ',');
+            getline(ss, baru->namaAlat, ',');
+            getline(ss, baru->kondisi, ',');
+            ss >> baru->jam; ss.ignore();
+            ss >> baru->tgl; ss.ignore();
+            ss >> baru->bln; ss.ignore();
+            ss >> baru->thn; ss.ignore();
+            
+            string status;
+            getline(ss, status, ',');
+            baru->masihDipinjam = (status == "Dipinjam");
+            baru->next = nullptr;
+            baru->prev = nullptr;
+            
+            if (head == nullptr) {
+                head = tail = baru;
+            } else {
+                tail->next = baru;
+                baru->prev = tail;
+                tail = baru;
+            }
+            
+            for (auto &a : daftarAlat) {
+                if (a.nama == baru->namaAlat && baru->masihDipinjam) {
+                    a.tersedia = false;
+                }
+            }
+        }
+        file.close();
+    }
+
+
 public:
     SimulatorPeminjaman() {
         head = nullptr;
         tail = nullptr;
+        muatDariCSV();
     }
 
     // 1. Fitur Tambah Data Alat
@@ -88,11 +172,21 @@ public:
 
         Peminjam* baru = new Peminjam();
         cin.ignore();
-        cout << "Nama Peminjam  : "; getline(cin, baru->nama);
-        cout << "NIM            : "; getline(cin, baru->nim);
+        
         cout << "Ruangan        : "; getline(cin, baru->ruangan);
         cout << "Kondisi Alat saat ini: "; getline(cin, baru->kondisi);
-        
+        cout << "Nama Peminjam: ";
+        getline(cin, baru->nama);
+
+        string nimLama = cariNIM(baru->nama);
+        if (nimLama != "") {
+            cout << "Peminjam dengan nama '" << baru->nama << "' sudah pernah meminjam sebelumnya.\n";
+            cout << "NIM otomatis diisi: " << nimLama << endl;
+            baru->nim = nimLama;
+        } else {
+            cout << "NIM (untuk peminjam baru): ";
+            getline(cin, baru->nim);
+        }
         baru->namaAlat = daftarAlat[pilihan - 1].nama;
         baru->jam = j; baru->tgl = t; baru->bln = b; baru->thn = th;
         baru->masihDipinjam = true;
@@ -109,6 +203,7 @@ public:
         }
 
         daftarAlat[pilihan - 1].tersedia = false;
+        simpanKeCSV();
         cout << "Peminjaman berhasil dicatat!\n";
         kembaliKeMenu();
     }
@@ -125,13 +220,18 @@ public:
         for (auto &a : daftarAlat) {
             if (a.nama == namaAlat && !a.tersedia) {
                 a.tersedia = true;
+                simpanKeCSV();
                 // Update status di riwayat (Fitur No 5)
                 Peminjam* temp = head;
                 while (temp) {
-                    if (temp->namaAlat == namaAlat) temp->masihDipinjam = false;
+                    if (temp->namaAlat == namaAlat && temp->masihDipinjam) {
+                        temp->masihDipinjam = false;
+                        break;
+                    }
                     temp = temp->next;
                 }
                 cout << "Alat '" << namaAlat << "' telah tersedia kembali.\n";
+                kembaliKeMenu();
                 return;
             }
         }
@@ -158,8 +258,8 @@ public:
             cout << "------------------------------------------\n";
             temp = temp->next;
         }
+        kembaliKeMenu();
     }
-    kembaliKeMenu();
     }
 
     // 5. Fitur Lacak Peminjam (Audit Mode)
@@ -178,6 +278,7 @@ public:
                 cout << "Nama     : " << temp->nama << " \n";
                 cout << "NIM      : " << temp->nim << "\n";
                 cout << "ruangan  : " << temp->ruangan << "\n";
+                cout << "Alat     : " << temp->namaAlat << "\n";
                 ketemu = true;
                 
             }
@@ -187,6 +288,7 @@ public:
         if (!ketemu) {
             cout << "Data peminjam tidak ditemukan.\n";
         }
+        kembaliKeMenu();
         
     }
 
