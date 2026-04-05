@@ -8,9 +8,11 @@ using namespace std;
 struct Peminjam {
     string nama;
     string nim;
+    string ruangan;
     string namaAlat;
-    string tanggalPinjam;
-    string kondisiAlat;
+    string kondisi;
+    int jam, tgl, bln, thn;
+    bool masihDipinjam; // Status untuk fitur No 4 & 5
     
     Peminjam* next;
     Peminjam* prev;
@@ -28,6 +30,14 @@ private:
     Peminjam* tail;
     vector<Alat> daftarAlat;
 
+    // Fungsi Pembantu untuk Navigasi (Fitur No 6)
+    void kembaliKeMenu() {
+        cout << "\n------------------------------------------\n";
+        cout << "Tekan Enter untuk kembali ke menu utama...";
+        cin.ignore();
+        cin.get();
+    }
+
 public:
     SimulatorPeminjaman() {
         head = nullptr;
@@ -42,33 +52,50 @@ public:
 
     // 2. Fitur Pinjam Alat (Insert Tail)
     void pinjamAlat() {
+        system("cls");
         if (daftarAlat.empty()) {
             cout << "Belum ada alat di inventaris.\n";
+            kembaliKeMenu();
             return;
         }
 
-        cout << "\n--- Daftar Alat ---\n";
+        cout << "\n=== FORM PEMINJAMAN ALAT (JAM KERJA 07:00 - 18:00) ===\n";
         for (int i = 0; i < daftarAlat.size(); i++) {
             cout << i + 1 << ". " << daftarAlat[i].nama << (daftarAlat[i].tersedia ? " [Tersedia]" : " [Dipinjam]") << endl;
         }
 
-        int pilihan;
+        int pilihan, j, t, b, th;
         cout << "Pilih nomor alat: ";
         cin >> pilihan;
 
         if (pilihan < 1 || pilihan > daftarAlat.size() || !daftarAlat[pilihan - 1].tersedia) {
             cout << "Alat tidak tersedia atau pilihan salah.\n";
+            kembaliKeMenu();
+            return;
+        }
+
+        cout << "Masukkan Jam (7-18): "; cin >> j;
+        cout << "Masukkan Tanggal (1-31): "; cin >> t;
+        cout << "Masukkan Bulan (1-12): "; cin >> b;
+        cout << "Masukkan Tahun (Min. 2026): "; cin >> th;
+
+        // VAlidasi Waktu & Tahun (Fitur No 1 & 2)
+        if (th < 2026 || j < 7 || j > 18) {
+            cout << "\n[ERROR]Waktu atau tahun tidak valid!\n";
+            kembaliKeMenu();
             return;
         }
 
         Peminjam* baru = new Peminjam();
         cin.ignore();
-        cout << "Nama Peminjam: "; getline(cin, baru->nama);
-        cout << "NIM: "; getline(cin, baru->nim);
-        cout << "Tanggal Pinjam: "; getline(cin, baru->tanggalPinjam);
-        cout << "Kondisi Alat saat ini: "; getline(cin, baru->kondisiAlat);
+        cout << "Nama Peminjam  : "; getline(cin, baru->nama);
+        cout << "NIM            : "; getline(cin, baru->nim);
+        cout << "Ruangan        : "; getline(cin, baru->ruangan);
+        cout << "Kondisi Alat saat ini: "; getline(cin, baru->kondisi);
         
         baru->namaAlat = daftarAlat[pilihan - 1].nama;
+        baru->jam = j; baru->tgl = t; baru->bln = b; baru->thn = th;
+        baru->masihDipinjam = true;
         baru->next = nullptr;
         baru->prev = nullptr;
 
@@ -83,11 +110,14 @@ public:
 
         daftarAlat[pilihan - 1].tersedia = false;
         cout << "Peminjaman berhasil dicatat!\n";
+        kembaliKeMenu();
     }
 
     // 3. Fitur Kembalikan Alat
     void kembalikanAlat() {
+        system("cls");
         string namaAlat;
+        cout << "=== PENGEMBALIAN ALAT ===\n";
         cout << "Masukkan nama alat yang dikembalikan: ";
         cin.ignore();
         getline(cin, namaAlat);
@@ -95,65 +125,84 @@ public:
         for (auto &a : daftarAlat) {
             if (a.nama == namaAlat && !a.tersedia) {
                 a.tersedia = true;
+                // Update status di riwayat (Fitur No 5)
+                Peminjam* temp = head;
+                while (temp) {
+                    if (temp->namaAlat == namaAlat) temp->masihDipinjam = false;
+                    temp = temp->next;
+                }
                 cout << "Alat '" << namaAlat << "' telah tersedia kembali.\n";
                 return;
             }
         }
         cout << "Alat tidak ditemukan atau sudah ada di lab.\n";
+        kembaliKeMenu();
     }
 
     // 4. Fitur Tampilkan Riwayat (Traversal)
     void tampilkanRiwayat() {
+        system("cls");
         if (!head) {
             cout << "Belum ada riwayat peminjaman.\n";
             return;
-        }
+        } else {
         Peminjam* temp = head;
         cout << "\n=== RIWAYAT PEMINJAMAN (Kronologis) ===\n";
         while (temp) {
-            cout << "[" << temp->nama << " | " << temp->namaAlat << " | " << temp->kondisiAlat << "]\n";
+            cout << "Nama     : " << temp->nama << " (" << temp->nim << ")\n";
+            cout << "Ruangan  : " << temp->ruangan << "\n";
+            cout << "Alat     : " << temp->namaAlat << "\n";
+            cout << "Kondisi  : " << temp->kondisi << "\n";
+            cout << "Waktu    : " << temp->tgl << "/" << temp->bln << "/" << temp->thn << " | Jam " << temp->jam << ":00\n";
+            cout << "Status   : " << (temp->masihDipinjam ? "Dipinjam" : "Sudah Dikembalikan") << "\n";
+            cout << "------------------------------------------\n";
             temp = temp->next;
         }
+    }
+    kembaliKeMenu();
     }
 
     // 5. Fitur Lacak Peminjam (Audit Mode)
     void lacakPeminjam() {
-        if (!head) return;
+        system("cls");
         string target;
         cout << "Masukkan nama peminjam yang ingin dilacak: ";
         cin.ignore();
         getline(cin, target);
 
         Peminjam* temp = head;
+        bool ketemu = false;
         while (temp) {
-            if (temp->nama == target) {
-                cout << "\n--- Hasil Pelacakan ---\n";
-                cout << "Peminjam: " << temp->nama << " (" << temp->namaAlat << ")\n";
+            if (temp->nama == target && temp->masihDipinjam) {
+                cout << "\n[DATA DITEMUKAN]\n";
+                cout << "Nama     : " << temp->nama << " \n";
+                cout << "NIM      : " << temp->nim << "\n";
+                cout << "ruangan  : " << temp->ruangan << "\n";
+                ketemu = true;
                 
-                if (temp->prev) 
-                    cout << "Sebelumnya dipegang oleh: " << temp->prev->nama << " (Kondisi: " << temp->prev->kondisiAlat << ")\n";
-                else 
-                    cout << "Sebelumnya: (Peminjam Pertama)\n";
-
-                if (temp->next)
-                    cout << "Setelahnya dipegang oleh: " << temp->next->nama << "\n";
-                else
-                    cout << "Setelahnya: (Masih dipegang/Peminjam Terakhir)\n";
-                return;
             }
             temp = temp->next;
+            }
+            
+        if (!ketemu) {
+            cout << "Data peminjam tidak ditemukan.\n";
         }
-        cout << "Data peminjam tidak ditemukan.\n";
+        
     }
 
     // 6. Cek Peminjam Terakhir
     void cekPeminjamTerakhir() {
+        system("cls");
+        cout << "=== CEK PEMINJAM TERAKHIR ===\n";
         if (tail) {
-            cout << "Peminjam terakhir secara keseluruhan adalah: " << tail->nama 
-                 << " meminjam " << tail->namaAlat << " (" << tail->kondisiAlat << ")\n";
+            cout << "Peminjam Terakhir: " << tail->nama << "\n";
+            cout << "NIM              : " << tail->nim << "\n";
+            cout << "Alat             : " << tail->namaAlat << "\n";
+            cout << "Status           : " << (tail->masihDipinjam ? "Masih Membawa Alat" : "Sudah Mengembalikan") << "\n";
         } else {
-            cout << "Belum ada data.\n";
+            cout << "Belum ada data peminjaman.\n";
         }
+        kembaliKeMenu();
     }
 };
 
